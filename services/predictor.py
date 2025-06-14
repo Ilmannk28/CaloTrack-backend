@@ -1,8 +1,9 @@
-# backend/services/predictor.py
 from ultralytics import YOLO
 import cv2
 from pathlib import Path
+import requests
 
+# Kalori tiap makanan
 calories_dict = {
     'white rice': 200,
     'fried chicken': 250,
@@ -11,12 +12,25 @@ calories_dict = {
     'sliced watermelon': 50
 }
 
-# Buat path absolut ke model
+# Lokasi model lokal
 base_path = Path(__file__).resolve().parent
-model_path = base_path.parent / "model" / "best.pt"
+model_dir = base_path.parent / "model"
+model_path = model_dir / "best.pt"
 
-if not model_path.exists():
-    raise FileNotFoundError(f"Model '{model_path}' tidak ditemukan.")
+# URL model di Hugging Face
+HUGGINGFACE_MODEL_URL = "https://huggingface.co/ilmannk28/calotrack-model/resolve/main/best.pt"
+
+# Fungsi untuk mengunduh model jika belum ada
+def download_model():
+    if not model_path.exists():
+        print("Model tidak ditemukan. Mengunduh dari Hugging Face...")
+        model_dir.mkdir(parents=True, exist_ok=True)
+        response = requests.get(HUGGINGFACE_MODEL_URL)
+        with open(model_path, "wb") as f:
+            f.write(response.content)
+        print("Model berhasil diunduh.")
+
+download_model()
 
 # Load model hanya sekali
 model = YOLO(str(model_path))
@@ -38,7 +52,6 @@ def predict_calories(image_path: str):
             confidence = float(box.conf[0])
             calories = calories_dict.get(class_name, 0)
 
-            # Ambil bounding box [x, y, w, h]
             bbox = box.xywh[0].tolist()
             x_center, y_center, width, height = bbox
             x = x_center - (width / 2)
@@ -56,4 +69,3 @@ def predict_calories(image_path: str):
         "predictions": predictions,
         "total_calories": total_calories
     }
-
